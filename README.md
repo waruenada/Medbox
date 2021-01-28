@@ -14,11 +14,12 @@ npm install
 - config/default.json
 ```
     {
-        "PORT": 9000,                           <=== port สำหรับ expose บอท [ Default : 9000 ]
+        "PORT": 9000,                           <=== port สำหรับ expose บอท
+                                                     default : 9000
         "BOTID": "Bdef36b...",                  <=== bot_id จาก bot ที่ทำการสร้างไว้ 
-                                                     [ https://chat-develop.one.th/develop/homepage ]
+                                                     https://chat-develop.one.th/develop/homepage
         "AUTHORIZATION": "Bearer Af7e8af0...",  <=== Token Service (Authorization)
-                                                     [ https://chat-develop.one.th/develop/information_dev ]
+                                                     https://chat-develop.one.th/develop/information_dev
         "LOGSERVER": "https://example.com"      <=== url server สำหรับเก็บ log การใช้งาน
     }
 ```
