@@ -1,0 +1,23 @@
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>medecinebox</title>
+    <script src="/js/medbox.js"></script>
+</head>
+<body>
+<a href="https://chat-api.one.th/go_api/api/v1/openScanQRcodeWithValue" target="_blank">
+      <font size=+4>Scan QR Code to Open Box</font>
+</a> 
+  <script>
+        let medbox = MedBoxController({
+            oneID : <%=oneID%>,
+            logEndpoint : "<%=logserver%>"
+        });
+        function oneChatCallBackQRScanner(qrcode){
+            medbox.openBoxByQRCode(qrcode.toString());
+        }
+    </script>
+    <div id="devicelist" width=300>
+</body>
+</html>
