@@ -6,9 +6,9 @@
 
 2. เตรียมโค้ดบอท
 ```
-git clone https://github.com/developer-space/medbox.git
-cd medbox
-npm install
+    $ git clone https://github.com/developer-space/medbox.git
+    $ cd medbox
+    $ npm install
 ```
 3. ตั้งค่า
 - config/default.json
@@ -35,10 +35,10 @@ npm install
 
 4. run bot
 ```
-    node index.js                               <=== start bot
+    $ node index.js                               <=== start bot
     
     # กรณีใช้ ngrok สำหรับ expose ให้สามารถเข้าใช้งานผ่านอินเตอร์เน็ตได้ (สำหรับทดสอบบนเครื่องส่วนตัว)
-    run ngrog port 9000
+    $ run ngrog port 9000
     
     # e.g. url ngrok สำหรับใช้งาน
     https://abc.ngrok.io/botmenu/medicinebox
