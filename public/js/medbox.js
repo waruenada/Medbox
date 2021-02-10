@@ -1,8 +1,5 @@
-let MedBox = function(param) {
-  	this.logEndpoint = param.logEndpoint;
-    	this.oneID = param.oneID;
-}
-let scan_job;
+let scan_job; 
+let write_job;
 
 function clearScanJob() {
     scan_job = {
@@ -11,10 +8,21 @@ function clearScanJob() {
         callback : ''
     }
 }
-
 clearScanJob();
 
+function clearWriteJob() {
+    write_job = {
+        uuid : '',
+        service: '',
+        characteristic : '',
+        callback : ''
+    }
+}
+clearWriteJob();
+
+
 function logtoHTML(input){
+    //alert(input)
     let out = input;
     if (typeof(input) == 'object') {
       try {
@@ -24,8 +32,12 @@ function logtoHTML(input){
           alert(e);
       }
     }
-    document.getElementById("devicelist").innerHTML = out + '<br>' + document.getElementById("devicelist").innerHTML;
-  }
+
+    let debugbox = document.getElementById("devicelist");
+    if (debugbox) {
+      debugbox.innerHTML = out + '<br>-------------------------------------------------<br>' + document.getElementById("devicelist").innerHTML;
+    }
+}
 
 function oneChatBluetoothCallBackData(type, data) {
     let message = '';
@@ -72,7 +84,6 @@ function oneChatBluetoothCallBackData(type, data) {
                 }
                 else {
                     if (scan_job.name && (scan_job.name == d.bluetooth_name)) {
-
                         logtoHTML('****** to write --><br>' + JSON.stringify({type, data}));
 
                         webkit.messageHandlers.OneChat_stopScanDevice.postMessage();
@@ -89,21 +100,42 @@ function oneChatBluetoothCallBackData(type, data) {
                         }
                     }
                 }
-                message += `
-                    name : ${d.bluetooth_name}<br>
-                    uuid : ${d.uuid}<br>
-                    manufacturer_data : ${mfdata}<br>
-                    state : ${d.state}<br>
-                    rssi : ${d.rssi}<br>
-                    raw : ${d.manufacturer_data}<br>
-                    -----------------------------------------------------<br>
-                `;
+
+                // message += `
+                //     name : ${d.bluetooth_name}<br>
+                //     uuid : ${d.uuid}<br>
+                //     manufacturer_data : ${mfdata}<br>
+                //     state : ${d.state}<br>
+                //     rssi : ${d.rssi}<br>
+                //     raw : ${d.manufacturer_data}<br>
+                // `;
             }
 
-            logtoHTML(message);
+            //logtoHTML(message);
+        }
+        else if (type == 'write_characteristic_by_uuid') {
+            logtoHTML(data);
+            if (data) {
+                try {
+                    let datajson = JSON.parse(data);
+                    if (datajson.device_uuid) {
+                        setTimeout(() => {
+                            webkit.messageHandlers.OneChat_disconnectBluetoothByUUID.postMessage(datajson.device_uuid);
+                            logtoHTML("disconnecting...");
+                          }, 2000);
+
+                        if (typeof(write_job.callback) == 'function') {
+                            write_job.callback();
+                        }
+                    }
+                }
+                catch(e) {
+                }
+            }
         }
         else {
-            if (type != 'return_once_device'  && type != 'start_scan_bluetooth' && type != 'write_characteristic_by_uuid' && type != 'stop_scan_bluetooth' ) {
+            if (type != 'return_once_device'  && type != 'start_scan_bluetooth' &&  type != 'stop_scan_bluetooth' ) {
+                //alert(JSON.stringify({type, data}, undefined, 4));
                 scandebug = false;
                 logtoHTML(data);
             }
@@ -111,8 +143,16 @@ function oneChatBluetoothCallBackData(type, data) {
     }
     catch(error) {
 
-    }
+    }        
 }
+
+
+let MedBox = function(param) {
+    this.logEndpoint = param.logEndpoint;
+    this.oneID = param.oneID;
+    this.timeout = param.timeout || 10000;
+}
+
 
 MedBox.prototype.log = function(data){
     fetch(this.logEndpoint, {
@@ -127,7 +167,7 @@ MedBox.prototype.log = function(data){
     })
     .then(res => {
         console.log('Success:', res.json);
-        //alert(JSON.stringify(data));
+        alert(JSON.stringify(data));
     })
     .catch((error) => {
         console.error('Error:', error);
@@ -135,12 +175,11 @@ MedBox.prototype.log = function(data){
     });
 }
 
-MedBox.prototype.openBoxByQRCode = function(qrcode){
+
+MedBox.prototype.openBoxByQRCode = function(qrcode, callback){
       const time_scan = 10000;
-      let serviceuuid = '....<service_uuid>....';
-      let characteristicuuid = '.....<characteristic_uuid>.....';
-      let datawrite = '0006CC59513C4CAA6116D34BF71000B12EF8';
-      let data_type = 'hex';
+      const scandebug = false;
+      const TIMEOUT = this.timeout;
 
       function scanDevice(filter={}, callback) {
           try {
@@ -159,40 +198,61 @@ MedBox.prototype.openBoxByQRCode = function(qrcode){
               webkit.messageHandlers.scanDevice.postMessage(time_scan);
           }
           catch(error) {
-        	alert('scanDevice ' + error);
+        			alert('scanDevice ' + error);
           }
       }
 
-      function unlockBLELock(mid) {
+      function unlockBLELock(mid, callback) {
+          let timer = 0;
+          timer = setTimeout(() => {
+              write_job.callback = '';
+              callback(404, 'Box not found');
+          }, TIMEOUT);
+
           scanDevice(mid, function(info) {
+              if (timer) {
+                  clearTimeout(timer);
+                  timer = 0;
+              }
+              timer = setTimeout(() => {
+                  write_job.callback = '';
+                  callback(500, 'Unlock Fail');
+              }, TIMEOUT);
+
               logtoHTML(info);
               webkit.messageHandlers.OneChat_writeCharacteristicByUUID.postMessage({
                   device_uuid: info.uuid,
-                  service_uuid: serviceuuid,
-                  characteristic_uuid: characteristicuuid,
-                  data: datawrite,
-                  data_type : data_type
+                  service_uuid: 'FF00',
+                  characteristic_uuid: 'FF01',
+                  data: '0006CC59513C4CAA6116D34BF71000B12EF8',
+                  data_type : 'hex'
               });
+
+              write_job.callback = function() {
+                  if (timer) {
+                      clearTimeout(timer);
+                      timer = 0;
+                  }
+                  callback(200, 'Unlock OK');
+              }
           });
       }
 
       if(qrcode) {
           let payload = {};
           let data = { "boxid": qrcode.toString() , "oneid": this.oneid, "time": new Date().getTime(), "result": "success"};
+
           if (qrcode.toLowerCase().startsWith('lys')) {
               payload = {'manufacturer_data':'0x'+qrcode.substr(3)};
           }
           else {
               payload = {'name': qrcode };
           }
-          unlockBLELock(payload);
           logtoHTML('Performing BLE scan for' + JSON.stringify(payload));
-          this.log(data);
+          unlockBLELock(payload, callback);
       }
-
 }
 
 function MedBoxController(param) {
   	return new MedBox(param);
 }
-
