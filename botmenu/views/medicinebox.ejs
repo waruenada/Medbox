@@ -13,11 +13,15 @@
         let medbox = MedBoxController({
             oneID : <%=oneID%>,
             logEndpoint : "<%=logserver%>"
+            timeout: 8000
         });
         function oneChatCallBackQRScanner(qrcode){
-            medbox.openBoxByQRCode(qrcode.toString());
+            medbox.openBoxByQRCode(qrcode.toString(), function (code, text) {
+                alert(`${code} -- ${text}`);
+            });
         }
     </script>
+
     <div id="devicelist" width=300>
 </body>
 </html>
