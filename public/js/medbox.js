@@ -21,7 +21,7 @@ function clearWriteJob() {
 clearWriteJob();
 
 
-function logtoHTML(input){
+function logtoHTML(input, header = ''){
     //alert(input)
     let out = input;
     if (typeof(input) == 'object') {
@@ -35,45 +35,63 @@ function logtoHTML(input){
 
     let debugbox = document.getElementById("devicelist");
     if (debugbox) {
-      debugbox.innerHTML = out + '<br>-------------------------------------------------<br>' + document.getElementById("devicelist").innerHTML;
+      if (header) {
+          header = ' '+header+' ';
+      }
+      debugbox.innerHTML = out + '<br>---'+ header +'-------------------------<br>' + document.getElementById("devicelist").innerHTML;
     }
 }
 
-function oneChatBluetoothCallBackData(type, data) {
+
+function swapFirst2ByteOnHex(hexstr) {
+    return hexstr.substr(2,2)+hexstr.substr(0,2)+hexstr.substr(4);
+}
+
+function isBoxMatched(target, found) {
+    let n_target = target.toLowerCase();
+    let n_found = found.toLowerCase();
+
+    if (n_found == n_target) return true;
+    if (n_found == swapFirst2ByteOnHex(n_target)) return true;
+    return false;
+}
+
+window.addEventListener('oneChatBluetoothCallBackData',  async(e) => {
     let message = '';
+
+    if (!e || !e.detail) {
+        return;
+    }
+
+    let type = e.detail.type;
+    let datastr = e.detail.data;
+    let data;
+
     try {
-        if (type == 'get_device_service') {
-            let obj = JSON.parse(data);
+        data = JSON.parse(datastr);
+    }
+    catch(e) {
+        data = {};
+    }
 
-            for (let i = 0; i < obj.data.length; i++) {
-                let d = obj.data[i];
-                let mfdata = 'N/A';
-                let m = {}, mx;
-
-                if (d.manufacturer_data) {
+    try {
+        if (type == 'return_once_device') {
+                let d = data.data;
+                mhex = d.manufacturer_data_haxa || d.manufacturer_data_hexa;
+                if (mhex) {
                     try {
-                        mx = d.manufacturer_data.replace(/[{} ]/g,'');
-                        let arr= mx.split(',');
-                        for (let c of arr) {
-                            let b = c.split('=');
-                            m[b[0]] = b[1];
-                        }
-
-                        if (m) {
-                            mfdata = m.bytes;
-                        }
-
-                        if (scan_job.manufacturer_data && (scan_job.manufacturer_data == mfdata)) {
-                            webkit.messageHandlers.OneChat_stopScanDevice.postMessage();
+                        if (scan_job.manufacturer_data && isBoxMatched(scan_job.manufacturer_data , mhex) ) {
+                            OneChat_stopScanDevice();
                             if (typeof (scan_job.callback) == 'function') {
-                                scan_job.callback({
-                                    count : i,
+
+                                let arg = {
                                     name : d.bluetooth_name,
                                     uuid : d.uuid,
-                                    manufacturer_data : d.manufacturer_data,
+                                    manufacturer_data : mhex,
                                     state : d.state,
                                     rssi: d.rssi
-                                });
+                                }
+                                scan_job.callback(arg);
                                 clearScanJob();
                             }
                         }
@@ -84,9 +102,10 @@ function oneChatBluetoothCallBackData(type, data) {
                 }
                 else {
                     if (scan_job.name && (scan_job.name == d.bluetooth_name)) {
-                        logtoHTML('****** to write --><br>' + JSON.stringify({type, data}));
+//                        logtoHTML('****** to write --><br>' + JSON.stringify({type, data}));
 
-                        webkit.messageHandlers.OneChat_stopScanDevice.postMessage();
+                        OneChat_stopScanDevice();
+
                         if (typeof (scan_job.callback) == 'function') {
                             scan_job.callback({
                                 round : i,
@@ -109,18 +128,19 @@ function oneChatBluetoothCallBackData(type, data) {
                 //     rssi : ${d.rssi}<br>
                 //     raw : ${d.manufacturer_data}<br>
                 // `;
-            }
+
 
             //logtoHTML(message);
         }
         else if (type == 'write_characteristic_by_uuid') {
             logtoHTML(data);
             if (data) {
-                try {
-                    let datajson = JSON.parse(data);
-                    if (datajson.device_uuid) {
+
+                    logtoHTML(data.device_uuid, 'writing data')
+
+                    if (data.device_uuid) {
                         setTimeout(() => {
-                            webkit.messageHandlers.OneChat_disconnectBluetoothByUUID.postMessage(datajson.device_uuid);
+                            OneChat_disconnectBluetoothByUUID(data.device_uuid);
                             logtoHTML("disconnecting...");
                           }, 2000);
 
@@ -128,23 +148,24 @@ function oneChatBluetoothCallBackData(type, data) {
                             write_job.callback();
                         }
                     }
-                }
-                catch(e) {
-                }
             }
         }
+        else if (type == 'disconnect_bluetooth_by_uuid') {
+            logtoHTML("disconnected");
+        }
         else {
-            if (type != 'return_once_device'  && type != 'start_scan_bluetooth' &&  type != 'stop_scan_bluetooth' ) {
+//            if (type != 'return_once_device'  && type != 'start_scan_bluetooth' &&  type != 'stop_scan_bluetooth' ) {
                 //alert(JSON.stringify({type, data}, undefined, 4));
+            if (type != 'get_device_service' ) {
                 scandebug = false;
-                logtoHTML(data);
+                logtoHTML(data, 'general log');
             }
         }
     }
     catch(error) {
 
     }        
-}
+});
 
 
 let MedBox = function(param) {
@@ -195,7 +216,7 @@ MedBox.prototype.openBoxByQRCode = function(qrcode, callback){
                       scan_job.callback = callback;
                   }
               }
-              webkit.messageHandlers.scanDevice.postMessage(time_scan);
+              OneChat_scanDevice(time_scan);
           }
           catch(error) {
         			alert('scanDevice ' + error);
@@ -210,6 +231,9 @@ MedBox.prototype.openBoxByQRCode = function(qrcode, callback){
           }, TIMEOUT);
 
           scanDevice(mid, function(info) {
+
+logtoHTML(info, 'scanDevice found info');
+
               if (timer) {
                   clearTimeout(timer);
                   timer = 0;
@@ -219,14 +243,17 @@ MedBox.prototype.openBoxByQRCode = function(qrcode, callback){
                   callback(500, 'Unlock Fail');
               }, TIMEOUT);
 
-              logtoHTML(info);
-              webkit.messageHandlers.OneChat_writeCharacteristicByUUID.postMessage({
-                  device_uuid: info.uuid,
-                  service_uuid: 'FF00',
-                  characteristic_uuid: 'FF01',
-                  data: '0006CC59513C4CAA6116D34BF71000B12EF8',
-                  data_type : 'hex'
-              });
+              logtoHTML(info, 'writing BLE');
+
+              OneChat_writeCharacteristicByUUID(info.uuid, 'FF00', 'FF01', '0006CC59513C4CAA6116D34BF71000B12EF8', 'hex');
+
+              // webkit.messageHandlers.OneChat_writeCharacteristicByUUID.postMessage({
+              //     device_uuid: info.uuid,
+              //     service_uuid: 'FF00',
+              //     characteristic_uuid: 'FF01',
+              //     data: '0006CC59513C4CAA6116D34BF71000B12EF8',
+              //     data_type : 'hex'
+              // });
 
               write_job.callback = function() {
                   if (timer) {
@@ -243,7 +270,7 @@ MedBox.prototype.openBoxByQRCode = function(qrcode, callback){
           let data = { "boxid": qrcode.toString() , "oneid": this.oneid, "time": new Date().getTime(), "result": "success"};
 
           if (qrcode.toLowerCase().startsWith('lys')) {
-              payload = {'manufacturer_data':'0x'+qrcode.substr(3)};
+              payload = {'manufacturer_data':qrcode.substr(3)};
           }
           else {
               payload = {'name': qrcode };
