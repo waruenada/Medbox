@@ -1,6 +1,6 @@
 {
-	"PORT": 9000,
-	"BOTID": "",
-	"AUTHORIZATION": "",
-	"LOGSERVER": ""
+    "PORT": 9000,
+    "BOTID": "Bab44da092865594fb367ff3933461af1",
+    "AUTHORIZATION": "Bearer A75817cf7dfd75dbabbc72a05dcabc48dd461161461394afb914f5e3a06eb7d0201f0e90d89534e56949dc870e0e54618",
+    "LOGSERVER": "https://example.com"
 }
